@@ -127,23 +127,26 @@ class TCPMonitorType extends MonitorType {
             const resp = await tcping(monitor.hostname, monitor.port);
             heartbeat.ping = resp;
             heartbeat.msg = `${resp} ms`;
-            heartbeat.status = UP;
         } catch {
             throw new Error("Connection failed");
         }
 
         let socket_;
 
-        // Handle TLS certificate checking for secure/starttls connections
-        if (["secure", "starttls"].includes(monitor.smtpSecurity) && monitor.isEnabledExpiryNotification()) {
-            const reuseSocket = monitor.smtpSecurity === "starttls" ? await this.performStartTls(monitor) : {};
-            socket_ = reuseSocket.socket;
-            await this.checkTlsCertificate(monitor, reuseSocket);
+        try {
+            // Handle TLS certificate checking for secure/starttls connections
+            if (["secure", "starttls"].includes(monitor.smtpSecurity) && monitor.isEnabledExpiryNotification()) {
+                const reuseSocket = monitor.smtpSecurity === "starttls" ? await this.performStartTls(monitor) : {};
+                socket_ = reuseSocket.socket;
+                await this.checkTlsCertificate(monitor, reuseSocket);
+            }
+        } finally {
+            if (socket_ && !socket_.destroyed) {
+                socket_.end();
+            }
         }
 
-        if (socket_ && !socket_.destroyed) {
-            socket_.end();
-        }
+        heartbeat.status = UP;
     }
 
     /**
